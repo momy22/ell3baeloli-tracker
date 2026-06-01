@@ -269,31 +269,67 @@ body{font-family:'Rajdhani',sans-serif;color:var(--text);min-height:100vh;overfl
 </div>
 
 <script>
-var FIREBASE = 'https://league-tracker-c40bd-default-rtdb.europe-west1.firebasedatabase.app';
-var DB_PATH = FIREBASE + '/tracker.json';
-var DB_STREAM = FIREBASE + '/tracker.json';
-var pendingType = null;
-var isWriting = false;
-var S = { lp: 74, games: [], start: 74 };
-var evtSource = null;
+// استدعاء مكتبات الفايربيز الأساسية من السيرفر الرسمي
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-var BQ = {
-  neutral: ["Heh... they haven't even started. This is going to be delicious.","Still watching from the shadows. Don't mind me.","The climb hasn't broken them yet. Patience.","I can smell the ranked anxiety from here."],
-  losing: ["Keep feeding. I'll collect my bet with interest.","Gold IV forever. The bet is MINE.","Every defeat sounds like music.","Struggling? Good. Stay there."],
-  winning: ["...They're actually winning? No. No no no.","Whatever. Lucky streak. Means nothing.","I'm not worried. DEFINITELY not worried.","This changes nothing. Plat is still so far."],
-  close: ["No... NO. They're actually going to do it.","How is this HAPPENING.","Impossible. I demand a rematch.","Fine. FINE. But it won't last."],
-  done: ["...I underestimated them. Dammit."]
-};
-var WT = ["Akali fades into smoke — Victory!","Shaco was everywhere — W!","Another step up the staircase!","Outplayed, outscaled, outcarried!","The bet gets closer to being won."];
-var LT = ["Briar grins from the shadows...","One step back. Two forward.","The blood price is paid. Reset.","Briar enjoyed that one.","Shake it off. Next game."];
+  // 1. ضع الـ Firebase Config اللي أنت جبته هنا بالظبط 👇
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",              // ضع الـ apiKey الحقيقي هنا
+    authDomain: "league-tracker-c40bd.firebaseapp.com",
+    databaseURL: "https://league-tracker-c40bd-default-rtdb.europe-west1.firebasedatabase.app", // ده الرابط الصحيح اللي ظهر في صورتك التانية
+    projectId: "league-tracker-c40bd",
+    storageBucket: "league-tracker-c40bd.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",  // ضع الرقم الخاص بك هنا
+    appId: "YOUR_APP_ID"                  // ضع الـ appId الخاص بك هنا
+  };
 
-function setSyncStatus(state, text) {
-  var dot = document.getElementById('syncDot');
-  var label = document.getElementById('syncLabel');
-  dot.className = 'sync-dot ' + state;
-  label.className = 'sync-label ' + state;
-  label.textContent = text;
-}
+  // 2. ربط وتشغيل الفايربيز في الصفحة
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  // المتغيرات الأساسية بتاعتك
+  var S = { lp: 74, games: [], start: 74 };
+  var isWriting = false;
+
+  // 3. التزامن التلقائي (Live Sync / Read Data)
+  // الدالة دي بتشتغل لوحدها أول ما الصفحة تفتح، وبتحدث نفسها فوراً أول ما أي داتا تتغير في الفايربيز
+  const trackerRef = ref(db, 'tracker');
+  
+  onValue(trackerRef, (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      S = data; // تحديث المتغير S بالبيانات الحية القادمة من الفايربيز
+      console.log("تم المزامنة بنجاح! الداتا الحالية هي:", S);
+      
+      // ⬇️ [خطوة هامة جداً] ⬇️
+      // هنا لازم تكتب الأكواد اللي بتحدث عناصر الـ HTML بتاعتك بناءً على القيم الجديدة.
+      // مثلاً لو عندك عنصر بيعرض الـ lp:
+      // document.getElementById('lp-text').innerText = S.lp;
+    } else {
+      console.log("الداتابيز فاضية، جاري رفع البيانات المبدئية...");
+      // لو الداتابيز لسه جديدة وفاضية تماماً، هيرفع البيانات المبدئية لـ S
+      updateTrackerData(S);
+    }
+  });
+
+  // 4. دالة لإرسال وتحديث البيانات في الفايربيز (Write Data)
+  // استدعي الدالة دي في كودك لما تحب تحفظ قيم جديدة (مثلاً بعد ما الجيم يخلص والـ lp يتغير)
+  function updateTrackerData(newData) {
+    isWriting = true;
+    set(trackerRef, newData)
+      .then(() => {
+        isWriting = false;
+        console.log("تم حفظ وتحديث البيانات في الفايربيز بنجاح!");
+      })
+      .catch((error) => {
+        isWriting = false;
+        console.error("حدث خطأ أثناء محاولة الحفظ:", error);
+      });
+  }
+
+  // لجعل الدالة قابلة للاستدعاء من أي مكان آخر في ملفات الـ JS العادية أو الـ HTML buttons
+  window.updateTrackerData = updateTrackerData;
 
 function rankName(lp) {
   if (lp >= 400) return 'Platinum IV';
