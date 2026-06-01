@@ -269,67 +269,116 @@ body{font-family:'Rajdhani',sans-serif;color:var(--text);min-height:100vh;overfl
 </div>
 
 <script>
-// استدعاء مكتبات الفايربيز الأساسية من السيرفر الرسمي
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+// 1. استيراد مكتبات فايربيز (تأكد من استخدام النسخة المتوافقة مع مشروعك)
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-  // 1. ضع الـ Firebase Config اللي أنت جبته هنا بالظبط 👇
+  // تذكر وضع بيانات الـ Config الخاصة بفايربيز هنا
   const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",              // ضع الـ apiKey الحقيقي هنا
-    authDomain: "league-tracker-c40bd.firebaseapp.com",
-    databaseURL: "https://league-tracker-c40bd-default-rtdb.europe-west1.firebasedatabase.app", // ده الرابط الصحيح اللي ظهر في صورتك التانية
-    projectId: "league-tracker-c40bd",
-    storageBucket: "league-tracker-c40bd.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",  // ضع الرقم الخاص بك هنا
-    appId: "YOUR_APP_ID"                  // ضع الـ appId الخاص بك هنا
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    databaseURL: "YOUR_DATABASE_URL",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
   };
 
-  // 2. ربط وتشغيل الفايربيز في الصفحة
+  // تهيئة فايربيز
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
 
-  // المتغيرات الأساسية بتاعتك
-  var S = { lp: 74, games: [], start: 74 };
-  var isWriting = false;
+  // الـ State الافتراضية للموقع
+  let S = {
+    lp: 0,
+    games: []
+  };
 
-  // 3. التزامن التلقائي (Live Sync / Read Data)
-  // الدالة دي بتشتغل لوحدها أول ما الصفحة تفتح، وبتحدث نفسها فوراً أول ما أي داتا تتغير في الفايربيز
-  const trackerRef = ref(db, 'tracker');
-  
-  onValue(trackerRef, (snapshot) => {
-    const data = snapshot.val();
-    if (data) {
-      S = data; // تحديث المتغير S بالبيانات الحية القادمة من الفايربيز
-      console.log("تم المزامنة بنجاح! الداتا الحالية هي:", S);
-      
-      // ⬇️ [خطوة هامة جداً] ⬇️
-      // هنا لازم تكتب الأكواد اللي بتحدث عناصر الـ HTML بتاعتك بناءً على القيم الجديدة.
-      // مثلاً لو عندك عنصر بيعرض الـ lp:
-      // document.getElementById('lp-text').innerText = S.lp;
-    } else {
-      console.log("الداتابيز فاضية، جاري رفع البيانات المبدئية...");
-      // لو الداتابيز لسه جديدة وفاضية تماماً، هيرفع البيانات المبدئية لـ S
-      updateTrackerData(S);
-    }
-  });
-
-  // 4. دالة لإرسال وتحديث البيانات في الفايربيز (Write Data)
-  // استدعي الدالة دي في كودك لما تحب تحفظ قيم جديدة (مثلاً بعد ما الجيم يخلص والـ lp يتغير)
-  function updateTrackerData(newData) {
-    isWriting = true;
-    set(trackerRef, newData)
-      .then(() => {
-        isWriting = false;
-        console.log("تم حفظ وتحديث البيانات في الفايربيز بنجاح!");
-      })
-      .catch((error) => {
-        isWriting = false;
-        console.error("حدث خطأ أثناء محاولة الحفظ:", error);
-      });
+  // 2. دوال التطبيق الأساسية
+  function updateUI() {
+    // كود تحديث واجهة المستخدم الخاص بك وصاحبك يوضع هنا
+    console.log("UI Updated", S);
   }
 
-  // لجعل الدالة قابلة للاستدعاء من أي مكان آخر في ملفات الـ JS العادية أو الـ HTML buttons
-  window.updateTrackerData = updateTrackerData;
+  function showToast(msg, type, duration) {
+    console.log(`Toast: ${msg}`);
+  }
+
+  function openModal(mode) {
+    console.log(`Modal opened in ${mode} mode`);
+    // اكتب هنا الأوامر لتغيير الستيت أو فتح المودال في الصفحة
+  }
+
+  function closeModal() {
+    // كود إغلاق المودال
+  }
+
+  function confirmModal() {
+    // كود تأكيد المودال وحفظ البيانات
+    saveToFirebase();
+  }
+
+  function undoGame() {
+    if (!S.games.length) return;
+    var last = S.games.pop();
+    S.lp = Math.max(0, S.lp + (last.r === 'win' ? -last.lp : last.lp));
+    showToast('Last game undone', 'lt', 2000);
+    updateUI();
+    saveToFirebase();
+  }
+
+  // دالة الحفظ في الفايربيز
+  function saveToFirebase() {
+    set(ref(db, 'roadToPlatinum/data'), S)
+      .then(() => console.log("Data saved successfully!"))
+      .catch((error) => console.error("Error saving data:", error));
+  }
+
+  // دالة جلب البيانات عند فتح الموقع
+  function loadFromFirebase() {
+    const dataRef = ref(db, 'roadToPlatinum/data');
+    onValue(dataRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        S = data;
+        updateUI();
+      }
+    });
+  }
+
+  // تشغيل جلب البيانات فوراً
+  loadFromFirebase();
+
+  // 3. حبل النجاة لصاحبك (جعل الدوال متاحة عالمياً في المتصفح والـ HTML)
+  window.openModal = openModal;
+  window.closeModal = closeModal;
+  window.confirmModal = confirmModal;
+  window.undoGame = undoGame;
+  window.updateUI = updateUI;
+  window.saveToFirebase = saveToFirebase;
+
+  /* ── ربط الأحداث (Event Listeners) داخل الموديول بشكل آمن ── */
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById('btnWin').addEventListener('click', function() { openModal('win'); });
+    document.getElementById('btnLoss').addEventListener('click', function() { openModal('loss'); });
+    document.getElementById('undoBtn').addEventListener('click', undoGame);
+    document.getElementById('modalConfirm').addEventListener('click', confirmModal);
+    document.getElementById('modalCancel').addEventListener('click', closeModal);
+    document.getElementById('btnClosePo').addEventListener('click', function() { document.getElementById('po').classList.remove('show'); });
+    document.getElementById('modalBg').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+    
+    document.getElementById('btnMinus').addEventListener('click', function() {
+      var inp = document.getElementById('lpInput');
+      var v = parseInt(inp.value, 10) || 0;
+      if (v > 1) inp.value = v - 1;
+    });
+    
+    document.getElementById('btnPlus').addEventListener('click', function() {
+      var inp = document.getElementById('lpInput');
+      var v = parseInt(inp.value, 10) || 0;
+      if (v < 150) inp.value = v + 1;
+    });
+  });
 
 function rankName(lp) {
   if (lp >= 400) return 'Platinum IV';
